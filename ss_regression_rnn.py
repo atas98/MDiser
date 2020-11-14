@@ -15,22 +15,13 @@ from plot_history import plot_history
 
 # %%
 # Make ss process model
-A = [[-6.06563565,  -91.44136501,   -5.18056403],
-     [0.96510955,   17.99936409,    1.11912107],
-     [-15.41658097, -244.30234385,  -14.14321333]]
-B = [[0.40439781],
-     [0.70342777],
-     [0.88882234]]
-C = [[-0.87086982, -0.48585514,  0.]]
-D = [[0.]]
+W1 = ctrl.rss(2, 1, 1)
 
-W1 = ctrl.rss(6, 1, 1)
-
-T = np.linspace(0, 25, 1000)
+T = np.linspace(0, 200, 400)
 Y = np.zeros_like(T)
 # W1 = ctrl.StateSpace(A, B, C, D)
 
-Y1, T1 = ctrl.impulse(W1, T=T)
+Y1, T1 = ctrl.step(W1)
 plt.plot(T1, Y1)
 plt.show()
 
@@ -38,10 +29,10 @@ plt.show()
 # Data preparation
 
 np.random.seed(1)
-T = np.linspace(0, 12, 120)
+T = np.linspace(0, 200, 400)
 Y_data = np.array([])
 U_data = np.array([])
-X_data = np.array([])
+X_data = np.array([0, 0, 0])
 
 # # step
 # for _ in range(5):
@@ -64,7 +55,7 @@ X_data = np.array([])
 # random reapeted signal
 for i in range(100):
     U1 = np.ones_like(T)*np.random.randint(-25, 25)
-    Y1, T1, X1 = ctrl.lsim(W1, U=U1, T=T, X0=X1[-1])
+    Y1, T1, X1 = ctrl.lsim(W1, U=U1, T=T, X0=X_data[-1])
     Y_data = np.append(Y_data, Y1)
     U_data = np.append(U_data, U1)
     X_data = np.append(X_data, X1)
@@ -89,6 +80,10 @@ for i in range(100):
 print(len(Y_data))
 plt.plot(Y_data)
 plt.show()
+# %%
+print(len(X_data))
+plt.plot(X_data[:50])
+plt.show()
 
 # %%
 # Dataframe creation
@@ -96,27 +91,21 @@ data = pd.DataFrame(data=np.array(
     [U_data, Y_data]).transpose(), columns=["U_data", "Y_data"])
 data['X_data_0'] = X_data.reshape(-1, 3)[:, 0]
 data['X_data_1'] = X_data.reshape(-1, 3)[:, 1]
-data['X_data_2'] = X_data.reshape(-1, 3)[:, 2]
 
 data['X_data_t-1_0'] = np.array([0, *X_data.reshape(-1, 3)[:, 0][:-1]])
 data['X_data_t-1_1'] = np.array([0, *X_data.reshape(-1, 3)[:, 1][:-1]])
-data['X_data_t-1_2'] = np.array([0, *X_data.reshape(-1, 3)[:, 2][:-1]])
 
 data['X_data_t-2_0'] = data['X_data_t-1_0'].shift(periods=1, fill_value=0.0)
 data['X_data_t-2_1'] = data['X_data_t-1_1'].shift(periods=1, fill_value=0.0)
-data['X_data_t-2_2'] = data['X_data_t-1_2'].shift(periods=1, fill_value=0.0)
 
 data['X_data_t-3_0'] = data['X_data_t-2_0'].shift(periods=1, fill_value=0.0)
 data['X_data_t-3_1'] = data['X_data_t-2_1'].shift(periods=1, fill_value=0.0)
-data['X_data_t-3_2'] = data['X_data_t-2_2'].shift(periods=1, fill_value=0.0)
 
 data['X_data_t-4_0'] = data['X_data_t-3_0'].shift(periods=1, fill_value=0.0)
 data['X_data_t-4_1'] = data['X_data_t-3_1'].shift(periods=1, fill_value=0.0)
-data['X_data_t-4_2'] = data['X_data_t-3_2'].shift(periods=1, fill_value=0.0)
 
 data['X_data_t-5_0'] = data['X_data_t-4_0'].shift(periods=1, fill_value=0.0)
 data['X_data_t-5_1'] = data['X_data_t-4_1'].shift(periods=1, fill_value=0.0)
-data['X_data_t-5_2'] = data['X_data_t-4_2'].shift(periods=1, fill_value=0.0)
 
 data['U_data_t-1'] = data['U_data'].shift(periods=1, fill_value=0.0)
 data['U_data_t-2'] = data['U_data'].shift(periods=2, fill_value=0.0)
