@@ -148,7 +148,6 @@ U_data = np.append(U_data, -input_seq_train)
 plt.plot(Y_data)
 plt.show()
 
-# %%
 # %% 
 Y_data = Y_data.T
 Y_data = Y_data[0:-1].reshape((-1, 1))
@@ -162,15 +161,18 @@ X_val.shape, Y_val.shape
 
 # %%
 
-# model = keras.models.Sequential()
-# #model.add(Dense(2, activation='relu',use_bias=False, input_dim=2*past))
-# model.add(layers.GRU(6, activation='linear', use_bias=False, input_shape=(10, 1)))
-# model.add(layers.Dense(1))
-# model.compile(optimizer='adam', loss='mse')
+model = keras.models.Sequential()
+#model.add(Dense(2, activation='relu',use_bias=False, input_dim=2*past))
+model.add(layers.GRU(6, activation='linear', use_bias=False, input_shape=(10, 1)))
+model.add(layers.Dense(1))
+model.compile(optimizer='adam', loss='mse')
 early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
 history = model.fit(X_train, Y_train, epochs=1000, batch_size=20,
                     validation_data=(X_val, Y_val), verbose=2, 
                     callbacks=[early_stop])
+
+# %%
+model = keras.models.load_model("Models/process_rnn")
 
 # %%
 plot_history(history)
@@ -236,7 +238,7 @@ U_data = np.array([])
 
 x0_train = np.zeros((2, 1))
 T=np.linspace(0, 50, 500)
-input_seq_train = np.repeat(np.random.rand(100)*np.ones_like(100)*20, 5)
+input_seq_train = np.ones_like(T)
 Y1, _, _ = ctrl.lsim(W1, U=input_seq_train, T=T)
 
 Y_data = np.append(Y_data, [Y1])
@@ -251,8 +253,9 @@ X_test = X_test.reshape(-1, 10, 1)
 
 Y_pred = model.predict(X_test)
 
-plt.plot(T[:-6], Y_pred)
-plt.plot(T[:-6], Y_test)
+plt.plot(T[:-5], np.concatenate([np.zeros(shape=(1,1)), Y_pred], axis=0), label="Y_pred")
+plt.plot(T[:-5], Y_data[:-4], label="Y_real")
+plt.legend()
 plt.show()
 # %%
 # Off-line prediction
@@ -263,7 +266,7 @@ Y_predicted_offline = np.zeros(shape=(predict_time, 1))
 Y_past = Y_pred[0:past, :].T
 X_predict_offline = np.zeros(shape=(1, 2*past))
 
-for i in range(0, predict_time):
+for i, t in enumerate(T):
     X_predict_offline[:, 0:past] = X_test[i+2*past, 0:past].T
     X_predict_offline[:, past:2*past] = Y_past
     y_predict_tmp = model.predict(X_predict_offline.reshape(1, 10, 1))
@@ -272,12 +275,12 @@ for i in range(0, predict_time):
     Y_past[:, -1] = y_predict_tmp
 
 # %%
-plt.plot(Y_predicted_offline)
-plt.plot(Y_test[:-10])
-plt.plot(Y_pred[:-10])
+plt.plot(Y_predicted_offline, label="Y_predicted_offline")
+plt.plot(Y_test, label="Y_test")
+plt.plot(Y_pred, label="Y_pred")
+plt.legend()
+plt.show()
 # %%
 Y_test[:-10].shape, Y_predicted_offline.shape, Y_pred[:-10].shape
 # %%
 model.save("Models/process_rnn")
-
-# %%
