@@ -7,14 +7,79 @@ from tensorflow.keras import layers
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 
+# # Environment
+# class Environment:
+#     @staticmethod
+#     def process(y,t,u):
+#         # dydt = (1.0/taup) * (-y + Kp * u)
+#         dydt = (1.0/0.6)*(0.05*u-y)
+#         return dydt
+    
+#     @staticmethod
+#     def reward(yt, sp):
+#         return -abs(yt-sp)
+
+#     def __init__(self, N=40, T=200, y0=0.0):
+#         self.y0 = y0
+#         self.T=T
+#         self.N=N
+#         self.dt = N/T
+#         self.reset()
+
+#     def __call__(self, u, sp):
+#         self.y_curr = odeint(self.process, 
+#                              self.y_curr, 
+#                              self.t_interval, 
+#                              args=(u,))[-1]
+#         self.t_interval = [t+self.dt for t in self.t_interval]
+#         return [self.y_curr, sp]
+
+#     def reset(self):
+#         self.y_curr=self.y0
+#         self.t_interval = [0, self.dt]
+#         return self.y_curr, 0.0
+
+
+# env = Environment()
+# print(env.reset())
+# Ys = [env(200, 1) for i in range(200)]
+# Ys = np.array(Ys)
+
+# plt.plot(Ys)
+# plt.show()
+
+
 # %%
-# Environment
-class Environment:  
+# Environment_v2.0
+class Environment:
+    @staticmethod
+    def simulate(A, B, C, initial_state, input_sequence, time_steps, sampling_period):
+        from numpy.linalg import inv
+        I = np.identity(A.shape[0])  # this is an identity matrix
+        Ad = inv(I-sampling_period*A)
+        Bd = Ad*sampling_period*B
+        Xd = np.zeros(shape=(A.shape[0], time_steps+1))
+        Yd = np.zeros(shape=(C.shape[0], time_steps+1))
+
+        for i in range(0, time_steps):
+            if i == 0:
+                Xd[:, [i]] = initial_state
+                Yd[:, [i]] = C*initial_state
+                x = Ad*initial_state+Bd*input_sequence[i]
+            else:
+                Xd[:, [i]] = x
+                Yd[:, [i]] = C*x
+                x = Ad*x+Bd*input_sequence[i]
+        Xd[:, [-1]] = x
+        Yd[:, [-1]] = C*x
+        return Xd, Yd
+    
     @staticmethod
     def reward(yt, sp):
         return -abs(yt-sp)
 
-    def __init__(self, N=40, T=200, y0=0.0):
+    def __init__(self, A, B, C, N=40, T=200, y0=0.0):
+        self.sys = {"A":A, "B":B, "C":C}
         self.y0 = y0
         self.T=T
         self.N=N
@@ -22,10 +87,7 @@ class Environment:
         self.reset()
 
     def __call__(self, u, sp):
-        self.y_curr = odeint(self.process, 
-                             self.y_curr, 
-                             self.t_interval, 
-                             args=(u,))[-1]
+        self.y_curr = 
         self.t_interval = [t+self.dt for t in self.t_interval]
         return [self.y_curr, sp]
 
@@ -80,7 +142,7 @@ print("Size of State Space ->  {}".format(num_states))
 num_actions = 1
 print("Size of Action Space ->  {}".format(num_actions))
 
-upper_bound = 250.0
+upper_bound = 1000.0
 lower_bound = 0.0
 
 class Buffer:
@@ -225,7 +287,7 @@ def policy(state, noise_object):
 # %%
 # Initializing hyperparameters
 
-ou_noise = OUActionNoise(np.zeros(1), std_deviation=.30)
+ou_noise = OUActionNoise(np.zeros(1), std_deviation=.5)
 
 actor_model = get_actor()
 critic_model = get_critic()
@@ -239,19 +301,20 @@ target_critic.set_weights(critic_model.get_weights())
 
 # Learning rate for actor-critic models
 critic_lr = 10**-4
-actor_lr = 10**-4
+actor_lr = 10**-5
 
 critic_optimizer = tf.keras.optimizers.Adam(critic_lr)
 actor_optimizer = tf.keras.optimizers.Adam(actor_lr)
 
-total_episodes = 500
+total_episodes = 1000
 # Discount factor for future rewards
-gamma = 0.99
+gamma = 0.98
 # Used to update target networks
-tau = 10**-3
+tau = 10**-4
 
 buffer = Buffer(50000, 128)
-env = Environment()
+env = Environment(np.matrix(A), np.matrix(B), np.matrix(C), 
+                   initial_state=np.zeros(shape=(4, 1)))
 # %%
 # Trainig loop
 
@@ -260,7 +323,7 @@ ep_reward_list = []
 # To store average reward history of last few episodes
 avg_reward_list = []
 
-# Takes about 4 min to train
+# Main training loop
 for ep in range(total_episodes):
 
     prev_state = env.reset()
@@ -269,15 +332,14 @@ for ep in range(total_episodes):
     # Generate new sp
     sp = np.random.uniform(0.1, 10.0)
 
-    for _ in range(200):
+    for _ in range(120):
 
         tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
 
-        action = policy(tf_prev_state, ou_noise).item()
+        action = np.reshape(policy(tf_prev_state, ou_noise), (1))
         # Recieve state and reward from environment.
         state = env(action, sp)
-        state[0] = state[0][0]
-        reward = Environment.reward(*state)
+        reward = Environment.reward(*state, 0.5, 1000.0)
 
         buffer.record((prev_state, action, reward, state))
         episodic_reward += reward
@@ -306,9 +368,11 @@ plt.show()
 
 # %%
 # Plotting process with nn_pid controller
-n = 500 # time points to plot
-T = 100.0 # final time
+n = 100 # time points to plot
+T = 10 # final time
 SP_start = 2.0 # time of set point change
+
+env.reset()
 
 def NNControled_Plot():
     t = np.linspace(0,T,n) # create time vector
@@ -326,11 +390,10 @@ def NNControled_Plot():
     for i in range(1,n):
         # simulate process for one time step
         ts = [t[i-1],t[i]]         # time interval
-        y = odeint(process,y0,ts,args=(OP[i-1],))  # compute next step
-        y0 = y[1]                  # record new initial condition
+        y = env(np.array(OP[i]).reshape(1), 0)         # compute next step
+        y0 = y[0]                  # record new initial condition
 
-        # generate new OP
-        PV[i] = y[1]               # record PV
+        PV[i] = y[0]               # record PV
         e[i] = SP[i] - PV[i]       # calculate error = SP - PV
 
         state = tf.expand_dims(tf.convert_to_tensor([PV[i], SP[i]]), 0)

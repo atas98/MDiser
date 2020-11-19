@@ -1,6 +1,7 @@
 # %%
 # Imports
 
+from AH_system_inditification_rnn import simulate
 import control.matlab as ctrl
 import ipywidgets as wg
 import matplotlib.pyplot as plt
@@ -51,11 +52,11 @@ T = np.linspace(0, 10, 50)
 Y = np.zeros_like(T)
 W1 = ctrl.StateSpace(A, B, C, D)
 
-Y1, T1, X1 = ctrl.lsim(W1, U=np.ones_like(T), T=T)
+X1, Y1 = simulate(W1.A, W1.B, W1.C, np.zeros((2, 1)), np.ones(100), 100, 0.2)
 plt.subplot(121)
-plt.plot(T1, Y1)
+plt.plot(Y1.T)
 plt.subplot(122)
-plt.plot(T1, X1)
+plt.plot(X1.T)
 plt.show()
 # %%
 # Loading rnn process model

@@ -15,13 +15,13 @@ from plot_history import plot_history
 
 # %%
 # Make ss process model
-W1 = ctrl.rss(2, 1, 1)
+W1 = ctrl.rss(4, 1, 1)
 
 T = np.linspace(0, 200, 400)
 Y = np.zeros_like(T)
 # W1 = ctrl.StateSpace(A, B, C, D)
 
-Y1, T1 = ctrl.step(W1)
+Y1, T1, X1 = ctrl.lsim(W1, T=np.linspace(0, 20, 160), U=np.ones(160))
 plt.plot(T1, Y1)
 plt.show()
 
