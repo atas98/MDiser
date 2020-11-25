@@ -1,47 +1,60 @@
+# %%
 import matplotlib.pyplot as plt
 import numpy as np
+import control.matlab as ctrl
+import scipy.signal as sig
 
 # %%
 
 def simulate(A, B, C, initial_state, input_sequence, time_steps, sampling_period):
-    from numpy.linalg import inv
     I = np.identity(A.shape[0])  # this is an identity matrix
-    Ad = inv(I-sampling_period*A)
-    Bd = Ad*sampling_period*B
-    Xd = np.zeros(shape=(A.shape[0], time_steps+1))
+    Ad = np.linalg.inv(I-np.dot(sampling_period, A))
+    Bd = np.dot(np.dot(Ad, sampling_period), B)
+    Xd = np.zeros(shape=(A.shape[0], B.shape[1], time_steps+1))
     Yd = np.zeros(shape=(C.shape[0], time_steps+1))
 
     for i in range(0, time_steps):
         if i == 0:
-            Xd[:, [i]] = initial_state
-            Yd[:, [i]] = C*initial_state
-            x = Ad*initial_state+Bd*input_sequence[i]
+            Xd[:, [i]] = initial_state #.reshape(A.shape[0], B.shape[1], 1)
+            Yd[:, [i]] = np.dot(C, initial_state)
+            x = np.dot(Ad, initial_state)+np.dot(Bd, input_sequence[i])
         else:
             Xd[:, [i]] = x
-            Yd[:, [i]] = C*x
-            x = Ad*x+Bd*input_sequence[i]
+            Yd[:, [i]] = np.dot(C, x)
+            x = np.dot(Ad, x)+np.dot(Bd, input_sequence[i])
     Xd[:, [-1]] = x
-    Yd[:, [-1]] = C*x
+    Yd[:, [-1]] = np.dot(C, x)
     return Xd, Yd
 
 # %%
-A = np.array(
-    [[-3.73845774,  0.91887332, -0.98887796, -1.93489807],
-     [-2.99520481, -0.06474333, -0.41704245, -3.11724574],
-     [ 2.62958444, -0.31955758, -0.64564190,  3.26552020],
-     [ 0.04782102, -0.67961865, -0.69458023, -2.54359985]])
-B = np.array(
-    [[-0.20367168],
-     [ 0.        ],
-     [-0.33708403],
-     [-1.12758918]])
+# A = np.array(
+#     [[-3.73845774,  0.91887332, -0.98887796, -1.93489807],
+#      [-2.99520481, -0.06474333, -0.41704245, -3.11724574],
+#      [ 2.62958444, -0.31955758, -0.64564190,  3.26552020],
+#      [ 0.04782102, -0.67961865, -0.69458023, -2.54359985]])
+# B = np.array(
+#     [[-0.20367168],
+#      [ 0.        ],
+#      [-0.33708403],
+#      [-1.12758918]])
 
-C = np.array([[ 0.25124848, -1.03273692,  0.        , -1.4901019 ]])
+# C = np.array([[ 0.25124848, -1.03273692,  0.        , -1.4901019 ]])
 
-W1 = ctrl.ss(A, B, C, [[0]])
+# W1 = ctrl.ss(A, B, C, [[0]])
+# W1 = ctrl.rss(4, 2, 2)
 
-Y1, T1 , X1 = ctrl.lsim(W1, T=np.linspace(0, 100, 200), U=np.ones_like(np.linspace(0, 100, 200)))
+Y1, T1, X1 = ctrl.lsim(W1, T=np.linspace(0, 40, 400), U=np.ones(shape=(400, 2)))
+# Y1, T1 , X1 = ctrl.lsim(W1, T=np.linspace(0, 100, 200), U=np.random.uniform(0, 50, size=(200, 2)))
+plt.figure(figsize=(15, 9))
+plt.subplot(211)
+plt.ylabel("yout")
 plt.plot(T1, Y1)
+plt.legend(["Вихід 1", "Вихід 2"], loc=4)
+plt.subplot(212)
+plt.ylabel("xout")
+plt.xlabel("T")
+plt.plot(T1, X1)
+plt.legend(["X1", "X2", "X3", "X4"], loc=4)
 plt.show()
 
 # %%
@@ -54,20 +67,22 @@ X1, Y1 = simulate(np.matrix(A), np.matrix(B), np.matrix(C),
                  )
 
 plt.plot(Y1.T)
+
 plt.show()
 # %%
+A, B, C = W1.A, W1.B, W1.C
 Ys = []
-X_tmp = np.zeros(shape=(4, 1))
+X_tmp = np.zeros(shape=(4, 2))
 for i in range(200):
     X_tmp, Y_tmp = simulate(
                     np.matrix(A), np.matrix(B), np.matrix(C), 
                     X_tmp, 
-                    np.ones(1),
+                    np.ones(2),
                     1, 
                     0.1
                 )
     Y_tmp = Y_tmp[-1][0]
-    X_tmp = X_tmp[:, -1].reshape((4, 1))
+    X_tmp = X_tmp[:, -1].reshape((4, 2))
     Ys.append(Y_tmp)
 
 Ys = np.array(Ys)
@@ -75,6 +90,26 @@ Ys.shape
 plt.plot(Ys)
 plt.show()
 
+# %%
+
+"""Test PID algorithm."""
+import scipy.signal as sig
+# transfer function in s-space describes sys
+tf = sig.tf2ss([10], [100, 10])
+times = np.arange(1, 200, 5.0)
+#step = 1 * np.ones(len(times))
+# initialize PID
+sysout = [0.0]
+pidout = [0.0]
+real_time = [0.0]
+for time in times:
+    real_time.append(time)
+    t, sysout, xout = sig.lsim(tf, np.ones_like(real_time), real_time)
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.plot(real_time, sysout, 'r')
+plt.show()
 
 # %%
 # u{ndarray}, sp -> generator -> y{ndarray} -> rating -> y_out, sp
@@ -181,10 +216,115 @@ plt.plot(SPs, label="u_out")
 plt.subplot(122)
 plt.plot(Us)
 plt.show()
+
 # %%
-A = W1.A
-B = W1.B
-C = W1.C
+# u{ndarray}, sp -> generator -> y{ndarray} -> rating -> y_out, sp
+
+# Environment
+class SlowEnvironment:       
+    
+    def __init__(self, A, B, C, D, T, p=5, delta=0.5, trust_time=5):
+        self.sys = sig.StateSpace(A, B, C, D)
+        
+        self.p = p
+        self.T = T
+
+        self.input_size = self.sys.B.shape[1]
+        self.output_size = self.sys.C.shape[0]
+
+        self.delta = delta
+        self.trust_time = trust_time
+
+        self.x0 = None
+
+        self.reset()
+
+    def __call__(self, u):
+        self.idx = self.idx+1
+        tmp_i = self.idx+self.p
+
+        self.U[tmp_i] = u
+        if self.idx == 1:
+            _, yout, xout = sig.lsim(self.sys, U=self.U[self.p:tmp_i], T=self.T[:self.idx], X0=self.x0)
+        self.x0 = xout
+        try:
+            self.Y[tmp_i] = yout[-1]
+        except:
+            self.Y[tmp_i] = yout.item()
+        return self.Y[tmp_i]
+
+
+    def reset(self, x0=None):
+        self.idx = 0
+        self.ontarget_time = 0
+        
+        self.Y = np.zeros(shape=(self.T.shape[0]+self.p, self.sys.C.shape[0]), dtype=np.float32)
+        self.U = np.zeros(shape=(self.T.shape[0]+self.p, self.sys.B.shape[1]), dtype=np.float32)
+        
+        prev_x0 = self.x0
+        self.x0 = x0
+
+        return prev_x0
+
+    def ret_state(self, sp):
+        # return <prev_ys, prev_actions, sps>, done
+        es = np.array([sp], dtype=np.float32).reshape(-1, order='F')-self.Y[self.idx+1, :].reshape(-1)
+        if np.all(es < self.delta):
+            self.ontarget_time = self.ontarget_time+1 
+        elif self.ontarget_time > 0:
+            self.ontarget_time = 0
+        return np.concatenate([self.U[self.idx:self.idx+self.p+1, :].reshape(-1, order='F'),
+                               self.Y[self.idx:self.idx+self.p+1, :].reshape(-1, order='F'),
+                               np.array([sp], dtype=np.float32).reshape(-1, order='F')]),\
+                               self.ontarget_time > self.trust_time
+    
+    def ret_state_e(self, sp):
+        # return <prev_ys, prev_actions, es>
+        es = np.array([sp], dtype=np.float32).reshape(-1, order='F')-self.Y[self.idx+1, :].reshape(-1)
+        return np.concatenate([self.U[self.idx:self.idx+self.p+1].reshape(-1, order='F'),
+                               self.Y[self.idx-self.p:self.idx+1].reshape(-1, order='F'),
+                               es])
+
+    @staticmethod
+    def reward_mae(state):
+        # some realy ugly code here
+        state = np.array(state)
+        yt = state[env.input_size*(env.p+1):env.input_size*(env.p+1)+env.output_size*(env.p+1)].reshape(env.output_size, -1)[:, -1]
+        sp = state[env.input_size*(env.p+1)+env.output_size*(env.p+1):]
+        return -np.sum(np.abs(yt-sp))
+
+    @staticmethod
+    def reward_polar(state, prev_state):
+        yt, sp = state
+        prev_yt, prev_sp = prev_state
+        try:
+            return np.sum([0 if np.abs(prev_yt_i-sp_i) > np.sum(np.abs(yt_i-sp_i))\
+                                else -1\
+                                    for yt_i, prev_yt_i, sp_i in zip(yt, prev_yt, sp)]) 
+        except:
+            return np.sum([0 if np.abs(prev_yt_i-sp) > np.sum(np.abs(yt_i-sp))\
+                                else -1\
+                                    for yt_i, prev_yt_i in zip(yt, prev_yt)]) 
+
+
+
+env = SlowEnvironment(W1.A, W1.B, W1.C, W1.D, np.linspace(0, 100, 201))
+env.reset()
+Ys = [env([1.0, 1.0]) for i in range(200)]
+Ys = np.array(Ys)
+# Ys = np.stack(Ys[1:, 0])
+
+plt.plot(Ys)
+plt.show()
 # %%
-A
+W1 = sig.StateSpace(W1.A, W1.B, W1.C, W1.D)
+_, yout = sig.step(W1, T=np.linspace(0, 100, 200))
+plt.plot(yout)
+# %%
+print(SlowEnvironment.reward_mae([Ys[10, 0], 5], [Ys[11, 0], 5]))
+# %%
+# Index last ys: state[env.input_size*(env.p+1):env.input_size*(env.p+1)+env.output_size*(env.p+1)].reshape(env.output_size, -1)[:, -1]
+# Index sps: state[env.input_size*(env.p+1)+env.output_size*(env.p+1):]
+# env.reset()
+env.ret_state(sp=np.array([5, -1]))
 # %%

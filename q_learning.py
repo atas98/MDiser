@@ -6,6 +6,11 @@ import tensorflow.keras
 from tensorflow.keras import layers
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
+import time
+import os
+import pickle
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # # Environment
 # class Environment:
@@ -48,62 +53,6 @@ from scipy.integrate import odeint
 # plt.plot(Ys)
 # plt.show()
 
-
-# %%
-# Environment_v2.0
-class Environment:
-    @staticmethod
-    def simulate(A, B, C, initial_state, input_sequence, time_steps, sampling_period):
-        from numpy.linalg import inv
-        I = np.identity(A.shape[0])  # this is an identity matrix
-        Ad = inv(I-sampling_period*A)
-        Bd = Ad*sampling_period*B
-        Xd = np.zeros(shape=(A.shape[0], time_steps+1))
-        Yd = np.zeros(shape=(C.shape[0], time_steps+1))
-
-        for i in range(0, time_steps):
-            if i == 0:
-                Xd[:, [i]] = initial_state
-                Yd[:, [i]] = C*initial_state
-                x = Ad*initial_state+Bd*input_sequence[i]
-            else:
-                Xd[:, [i]] = x
-                Yd[:, [i]] = C*x
-                x = Ad*x+Bd*input_sequence[i]
-        Xd[:, [-1]] = x
-        Yd[:, [-1]] = C*x
-        return Xd, Yd
-    
-    @staticmethod
-    def reward(yt, sp):
-        return -abs(yt-sp)
-
-    def __init__(self, A, B, C, N=40, T=200, y0=0.0):
-        self.sys = {"A":A, "B":B, "C":C}
-        self.y0 = y0
-        self.T=T
-        self.N=N
-        self.dt = N/T
-        self.reset()
-
-    def __call__(self, u, sp):
-        self.y_curr = 
-        self.t_interval = [t+self.dt for t in self.t_interval]
-        return [self.y_curr, sp]
-
-    def reset(self):
-        self.y_curr=self.y0
-        self.t_interval = [0, self.dt]
-        return self.y_curr, 0.0
-
-
-env = Environment()
-print(env.reset())
-Ys = [env(200, 1) for i in range(200)]
-Ys = np.array(Ys)
-
-plt.plot(Ys)
-plt.show()
 # %%
 # Ornstein-Uhlenbeck process
 
@@ -137,13 +86,13 @@ class OUActionNoise:
 # %%
 # The Buffer class implements Experience Replay Memory.
 
-num_states = 2
+num_states = 26
 print("Size of State Space ->  {}".format(num_states))
-num_actions = 1
+num_actions = 2
 print("Size of Action Space ->  {}".format(num_actions))
 
-upper_bound = 1000.0
-lower_bound = 0.0
+upper_bound = 100.0
+lower_bound = -100.0
 
 class Buffer:
     def __init__(self, buffer_capacity=100000, batch_size=64):
@@ -205,6 +154,7 @@ class Buffer:
             actor_loss = -tf.math.reduce_mean(critic_value)
 
         actor_grad = tape.gradient(actor_loss, actor_model.trainable_variables)
+
         actor_optimizer.apply_gradients(
             zip(actor_grad, actor_model.trainable_variables)
         )
@@ -243,7 +193,7 @@ def get_actor():
     inputs = layers.Input(shape=(num_states,))
     out = layers.Dense(256, activation="relu")(inputs)
     out = layers.Dense(256, activation="relu")(out)
-    outputs = layers.Dense(1, activation="tanh", kernel_initializer=last_init)(out)
+    outputs = layers.Dense(num_actions, activation="tanh", kernel_initializer=last_init)(out)
 
     # Our upper bound is 2.0 for Pendulum.
     outputs = outputs * upper_bound
@@ -287,36 +237,43 @@ def policy(state, noise_object):
 # %%
 # Initializing hyperparameters
 
-ou_noise = OUActionNoise(np.zeros(1), std_deviation=.5)
+ou_noise = OUActionNoise(np.zeros(1), std_deviation=.2)
 
-actor_model = get_actor()
-critic_model = get_critic()
+# actor_model = get_actor()
+# critic_model = get_critic()
 
-target_actor = get_actor()
-target_critic = get_critic()
+# target_actor = get_actor()
+# target_critic = get_critic()
 
 # Making the weights equal initially
-target_actor.set_weights(actor_model.get_weights())
-target_critic.set_weights(critic_model.get_weights())
+# target_actor.set_weights(actor_model.get_weights())
+# target_critic.set_weights(critic_model.get_weights())
 
 # Learning rate for actor-critic models
-critic_lr = 10**-4
-actor_lr = 10**-5
+critic_lr = 10**-5
+actor_lr = 10**-7
 
 critic_optimizer = tf.keras.optimizers.Adam(critic_lr)
 actor_optimizer = tf.keras.optimizers.Adam(actor_lr)
 
-total_episodes = 1000
+total_episodes = 5000
 # Discount factor for future rewards
-gamma = 0.98
+gamma = 0.99
 # Used to update target networks
 tau = 10**-4
 
-buffer = Buffer(50000, 128)
-env = Environment(np.matrix(A), np.matrix(B), np.matrix(C), 
-                   initial_state=np.zeros(shape=(4, 1)))
+
+# buffer = Buffer(50000, 128)
+
+# T = np.linspace(0, 100, 200)
+# env = SlowEnvironment(W1.A, W1.B, W1.C, W1.D, T, p=5, delta=0.1, trust_time=6)
 # %%
 # Trainig loop
+# [~] TODO: Checkpoints
+# [ ] TODO: Prioritized replay memory
+# [x] TODO: Early episode break (5 timesteps within specified delta)
+
+start_time = time.time()
 
 # To store reward history of each episode
 ep_reward_list = []
@@ -326,20 +283,23 @@ avg_reward_list = []
 # Main training loop
 for ep in range(total_episodes):
 
-    prev_state = env.reset()
+    env.reset()
+    prev_state = np.zeros(num_states)
     episodic_reward = 0
 
     # Generate new sp
-    sp = np.random.uniform(0.1, 10.0)
+    sp = np.random.uniform(0.1, 10.0, size=env.input_size)
 
-    for _ in range(120):
+    for _ in range(len(T)-1):
 
         tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
 
-        action = np.reshape(policy(tf_prev_state, ou_noise), (1))
+        action = np.reshape(policy(tf_prev_state, ou_noise), (2))
         # Recieve state and reward from environment.
-        state = env(action, sp)
-        reward = Environment.reward(*state, 0.5, 1000.0)
+        # ret_state -> Ys[:p]
+        env(action)
+        state, done = env.ret_state(sp)
+        reward = env.reward_mae(state)
 
         buffer.record((prev_state, action, reward, state))
         episodic_reward += reward
@@ -347,6 +307,9 @@ for ep in range(total_episodes):
         buffer.learn()
         update_target(target_actor.variables, actor_model.variables, tau)
         update_target(target_critic.variables, critic_model.variables, tau)
+
+        if done:
+            break
 
         prev_state = state
 
@@ -356,18 +319,27 @@ for ep in range(total_episodes):
     avg_reward = np.mean(ep_reward_list[-40:])
     avg_reward_list.append(avg_reward)
 
-    if ep %50 == 0:
+    if ep %20 == 0:
         print("Episode * {} * Avg Reward is ==> {}".format(ep, avg_reward))
+        # Save target model if its reward is more than reward of prev saved model
+    if ep %1000 == 0:
+        target_actor.save(f'Models/q_learning/MIMO/actor_ep{11000+ep}')
+        target_critic.save(f'Models/q_learning/MIMO/critic_ep{11000+ep}')
+
 
 # Plotting graph
 # Episodes versus Avg. Rewards
+end_time = time.time() - start_time
+print("Training time, s: ", end_time)
+print("Training time for episode, s: ", end_time/total_episodes)
+
 plt.plot(avg_reward_list)
 plt.xlabel("Episode")
 plt.ylabel("Avg. Epsiodic Reward")
 plt.show()
 
 # %%
-# Plotting process with nn_pid controller
+# Plotting process with nn controller
 n = 100 # time points to plot
 T = 10 # final time
 SP_start = 2.0 # time of set point change
@@ -419,4 +391,36 @@ plt.plot(t,OP1,'b--',linewidth=2,label='Controller Output (OP)')
 plt.legend(loc='best')
 plt.xlabel('time')
 plt.show()
+# %%
+env.reset()
+Ys = []
+Us = []
+for _ in range(len(T)-1):
+    # TODO: add x0 to reset function and return prev_x0
+    state, _ = env.ret_state(np.array([5, 5]))
+    action = target_actor(state.reshape(1, -1)).numpy()
+    Ys.append(env(action))
+    Us.append(action)
+
+Us = np.array(Us)
+Ys = np.array(Ys)
+
+plt.figure(figsize=(15, 7))
+plt.subplot(121)
+plt.title("Виходи процесу")
+plt.ylabel("Y")
+plt.xlabel("T")
+plt.plot(np.linspace(0, 100, 199), Ys)
+plt.plot(np.linspace(0, 100, 199), np.ones(199)*Ys[-1, 0], ":")
+plt.legend(["Вихід 1", "Вихід 2", "Завдання"])
+plt.subplot(122)
+plt.legend(["1", "2"], loc=4)
+plt.xlabel("T")
+plt.ylabel("U")
+plt.title("Сигнали керування")
+plt.plot(Us[:, 0, :])
+plt.show()
+# %%
+target_actor.save(f'Models/q_learning/MIMO/target_actor')
+target_critic.save(f'Models/q_learning/MIMO/target_critic')
 # %%
