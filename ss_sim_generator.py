@@ -236,6 +236,7 @@ class SlowEnvironment:
         self.trust_time = trust_time
 
         self.x0 = None
+        self.xout = None
 
         self.reset()
 
@@ -246,7 +247,7 @@ class SlowEnvironment:
         self.U[tmp_i] = u
         if self.idx == 1:
             _, yout, xout = sig.lsim(self.sys, U=self.U[self.p:tmp_i], T=self.T[:self.idx], X0=self.x0)
-        self.x0 = xout
+        self.xout = xout[-1]
         try:
             self.Y[tmp_i] = yout[-1]
         except:
@@ -261,10 +262,8 @@ class SlowEnvironment:
         self.Y = np.zeros(shape=(self.T.shape[0]+self.p, self.sys.C.shape[0]), dtype=np.float32)
         self.U = np.zeros(shape=(self.T.shape[0]+self.p, self.sys.B.shape[1]), dtype=np.float32)
         
-        prev_x0 = self.x0
         self.x0 = x0
-
-        return prev_x0
+        return self.xout
 
     def ret_state(self, sp):
         # return <prev_ys, prev_actions, sps>, done
