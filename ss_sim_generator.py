@@ -28,23 +28,25 @@ def simulate(A, B, C, initial_state, input_sequence, time_steps, sampling_period
 
 # %%
 # A = np.array(
-#     [[-3.73845774,  0.91887332, -0.98887796, -1.93489807],
-#      [-2.99520481, -0.06474333, -0.41704245, -3.11724574],
-#      [ 2.62958444, -0.31955758, -0.64564190,  3.26552020],
-#      [ 0.04782102, -0.67961865, -0.69458023, -2.54359985]])
+#     [[2.894, 12.38, -11.17, 1.982],
+#      [-2.43, -7.32, 5.926, -2.14],
+#      [0.247, -1.43, 1.583,  0.725],
+#      [1.093, 3.125, 2.818, 0.612]])
 # B = np.array(
-#     [[-0.20367168],
-#      [ 0.        ],
-#      [-0.33708403],
-#      [-1.12758918]])
+#     [[0.557, -0.31],
+#      [0.157, 1.382],
+#      [-1.53, 0.488],
+#      [0.967, -0.89]])
+# C = np.array([[ -1.699, 0, 0.279, 1.346 ],
+#               [ 0, -1.919, 1.499, 0.612 ]])
 
-# C = np.array([[ 0.25124848, -1.03273692,  0.        , -1.4901019 ]])
+# W1 = ctrl.ss(A, B, C, np.zeros((2,2)))
+W1 = ctrl.rss(4, 2, 2)
 
-# W1 = ctrl.ss(A, B, C, [[0]])
-# W1 = ctrl.rss(4, 2, 2)
+U = np.array([np.concatenate([np.ones(1), np.ones(499)]).reshape(-1, 1), np.concatenate([np.ones(1), np.ones(499)]).reshape(-1, 1)]).reshape(500, 2)
 
-Y1, T1, X1 = ctrl.lsim(W1, T=np.linspace(0, 40, 400), U=np.ones(shape=(400, 2)))
-# Y1, T1 , X1 = ctrl.lsim(W1, T=np.linspace(0, 100, 200), U=np.random.uniform(0, 50, size=(200, 2)))
+Y1, T1, X1 = ctrl.lsim(W1, T=np.linspace(0, 50, 500), U=U)
+# Y1, T1 , X1 = ctrl.lsim(W1, T=np.linspace(0, 100, 200), U=np.random.uniform(0, 50, size=(200, 2)))(500, 1)
 plt.figure(figsize=(15, 9))
 plt.subplot(211)
 plt.ylabel("yout")
@@ -245,13 +247,12 @@ class SlowEnvironment:
         tmp_i = self.idx+self.p
 
         self.U[tmp_i] = u
-        if self.idx == 1:
-            _, yout, xout = sig.lsim(self.sys, U=self.U[self.p:tmp_i], T=self.T[:self.idx], X0=self.x0)
-        self.xout = xout[-1]
+        _, yout, xout = sig.lsim(self.sys, U=self.U[self.p:tmp_i], T=self.T[:self.idx], X0=self.x0)
         try:
             self.Y[tmp_i] = yout[-1]
         except:
             self.Y[tmp_i] = yout.item()
+        self.xout = xout[-1]
         return self.Y[tmp_i]
 
 
@@ -307,14 +308,15 @@ class SlowEnvironment:
 
 
 
-env = SlowEnvironment(W1.A, W1.B, W1.C, W1.D, np.linspace(0, 100, 201))
-env.reset()
-Ys = [env([1.0, 1.0]) for i in range(200)]
+env = SlowEnvironment(W1.A, W1.B, W1.C, W1.D, np.linspace(0, 70, 201))
+x0 = env.reset()
+Ys = [env([1.0]) for i in range(200)]
 Ys = np.array(Ys)
 # Ys = np.stack(Ys[1:, 0])
 
-plt.plot(Ys)
+plt.plot(np.linspace(0, 70, 200), Ys)
 plt.show()
+print(env.reset())
 # %%
 W1 = sig.StateSpace(W1.A, W1.B, W1.C, W1.D)
 _, yout = sig.step(W1, T=np.linspace(0, 100, 200))
@@ -325,5 +327,5 @@ print(SlowEnvironment.reward_mae([Ys[10, 0], 5], [Ys[11, 0], 5]))
 # Index last ys: state[env.input_size*(env.p+1):env.input_size*(env.p+1)+env.output_size*(env.p+1)].reshape(env.output_size, -1)[:, -1]
 # Index sps: state[env.input_size*(env.p+1)+env.output_size*(env.p+1):]
 # env.reset()
-env.ret_state(sp=np.array([5, -1]))
+env.ret_state(sp=np.array([5]))
 # %%
