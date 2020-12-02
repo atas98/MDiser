@@ -10,8 +10,8 @@ def simulate(A, B, C, initial_state, input_sequence, time_steps, sampling_period
     I = np.identity(A.shape[0])  # this is an identity matrix
     Ad = np.linalg.inv(I-np.dot(sampling_period, A))
     Bd = np.dot(np.dot(Ad, sampling_period), B)
-    Xd = np.zeros(shape=(A.shape[0], B.shape[1], time_steps+1))
-    Yd = np.zeros(shape=(C.shape[0], time_steps+1))
+    Xd = np.zeros(shape=(A.shape[0], B.shape[1], time_steps+1)) # 4x2
+    Yd = np.zeros(shape=(C.shape[0], time_steps+1)) # 2
 
     for i in range(0, time_steps):
         if i == 0:
@@ -23,40 +23,40 @@ def simulate(A, B, C, initial_state, input_sequence, time_steps, sampling_period
             Yd[:, [i]] = np.dot(C, x)
             x = np.dot(Ad, x)+np.dot(Bd, input_sequence[i])
     Xd[:, [-1]] = x
-    Yd[:, [-1]] = np.dot(C, x)
+    Yd[:, [-1]] = np.dot(C, x) # 2x4 . 
     return Xd, Yd
 
 # %%
-# A = np.array(
-#     [[2.894, 12.38, -11.17, 1.982],
-#      [-2.43, -7.32, 5.926, -2.14],
-#      [0.247, -1.43, 1.583,  0.725],
-#      [1.093, 3.125, 2.818, 0.612]])
-# B = np.array(
-#     [[0.557, -0.31],
-#      [0.157, 1.382],
-#      [-1.53, 0.488],
-#      [0.967, -0.89]])
-# C = np.array([[ -1.699, 0, 0.279, 1.346 ],
-#               [ 0, -1.919, 1.499, 0.612 ]])
+A = np.matrix([[-8.19602524e-01, -5.30764289e+00,  9.60996874e+00, -3.73225374e+00],
+               [ 5.93765570e-03, -5.13378511e+00,  8.16602053e+00, -3.23781101e+00],
+               [-1.13225282e-01, -1.16381820e+00,  1.74885985e+00, -8.34686690e-01],
+               [ 2.20462904e-02, -2.32325063e-01,  3.93052884e-01, -4.71165499e-01]])
+B = np.matrix([[ 0.86651717,  0.24843595],
+               [ 0.58334683,  0.        ],
+               [ 0.35637561, -0.8226274 ],
+               [ 1.28363613,  0.7931689 ]])
+C = [[-0.         , 0.64754102,  0.        , -0.03895053],
+     [ 0.         , 0.        , -0.        , -1.17455932]]
+D = np.matrix([[0., 0.],
+               [0., 0.]])
 
-# W1 = ctrl.ss(A, B, C, np.zeros((2,2)))
-W1 = ctrl.rss(4, 2, 2)
+W1 = ctrl.ss(A, B, C, D)
+# W1 = ctrl.rss(4, 2, 2)
 
-U = np.array([np.concatenate([np.ones(1), np.ones(499)]).reshape(-1, 1), np.concatenate([np.ones(1), np.ones(499)]).reshape(-1, 1)]).reshape(500, 2)
+U = np.array([np.concatenate([np.ones(1), np.zeros(499)]).reshape(-1, 1), np.concatenate([np.zeros(1), np.zeros(499)]).reshape(-1, 1)]).reshape(500, 2)
 
 Y1, T1, X1 = ctrl.lsim(W1, T=np.linspace(0, 50, 500), U=U)
 # Y1, T1 , X1 = ctrl.lsim(W1, T=np.linspace(0, 100, 200), U=np.random.uniform(0, 50, size=(200, 2)))(500, 1)
 plt.figure(figsize=(15, 9))
-plt.subplot(211)
+# plt.subplot(211)
 plt.ylabel("yout")
 plt.plot(T1, Y1)
 plt.legend(["Вихід 1", "Вихід 2"], loc=4)
-plt.subplot(212)
-plt.ylabel("xout")
-plt.xlabel("T")
-plt.plot(T1, X1)
-plt.legend(["X1", "X2", "X3", "X4"], loc=4)
+# plt.subplot(212)
+# plt.ylabel("xout")
+# plt.xlabel("T")
+# plt.plot(T1, X1)
+# plt.legend(["X1", "X2", "X3", "X4"], loc=4)
 plt.show()
 
 # %%

@@ -11,48 +11,6 @@ import os
 import pickle
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-# # Environment
-# class Environment:
-#     @staticmethod
-#     def process(y,t,u):
-#         # dydt = (1.0/taup) * (-y + Kp * u)
-#         dydt = (1.0/0.6)*(0.05*u-y)
-#         return dydt
-    
-#     @staticmethod
-#     def reward(yt, sp):
-#         return -abs(yt-sp)
-
-#     def __init__(self, N=40, T=200, y0=0.0):
-#         self.y0 = y0
-#         self.T=T
-#         self.N=N
-#         self.dt = N/T
-#         self.reset()
-
-#     def __call__(self, u, sp):
-#         self.y_curr = odeint(self.process, 
-#                              self.y_curr, 
-#                              self.t_interval, 
-#                              args=(u,))[-1]
-#         self.t_interval = [t+self.dt for t in self.t_interval]
-#         return [self.y_curr, sp]
-
-#     def reset(self):
-#         self.y_curr=self.y0
-#         self.t_interval = [0, self.dt]
-#         return self.y_curr, 0.0
-
-
-# env = Environment()
-# print(env.reset())
-# Ys = [env(200, 1) for i in range(200)]
-# Ys = np.array(Ys)
-
-# plt.plot(Ys)
-# plt.show()
-
 # %%
 # Ornstein-Uhlenbeck process
 
@@ -91,8 +49,8 @@ print("Size of State Space ->  {}".format(num_states))
 num_actions = 2
 print("Size of Action Space ->  {}".format(num_actions))
 
-upper_bound = 100.0
-lower_bound = 0.0
+upper_bound = 200.0
+lower_bound = -200.0
 
 class Buffer:
     def __init__(self, buffer_capacity=100000, batch_size=64):
@@ -237,7 +195,7 @@ def policy(state, noise_object):
 # %%
 # Initializing hyperparameters
 
-ou_noise = OUActionNoise(np.zeros(1), std_deviation=.4)
+ou_noise = OUActionNoise(np.zeros(1), std_deviation=.9)
 
 actor_model = get_actor()
 critic_model = get_critic()
@@ -251,14 +209,14 @@ target_critic.set_weights(critic_model.get_weights())
 
 # Learning rate for actor-critic models
 critic_lr = 10**-4
-actor_lr = 10**-6
+actor_lr = 10**-5
 
 critic_optimizer = tf.keras.optimizers.Adam(critic_lr)
 actor_optimizer = tf.keras.optimizers.Adam(actor_lr)
 
-total_episodes = 6000
+total_episodes = 5000
 # Discount factor for future rewards
-gamma = 0.99
+gamma = 0.98
 # Used to update target networks
 tau = 10**-4
 
@@ -276,9 +234,9 @@ env = SlowEnvironment(W1.A, W1.B, W1.C, W1.D, T, p=5, delta=0.1, trust_time=6)
 start_time = time.time()
 
 # To store reward history of each episode
-ep_reward_list = []
+# ep_reward_list = []
 # To store average reward history of last few episodes
-avg_reward_list = []
+# avg_reward_list = []
 
 # Main training loop
 for ep in range(total_episodes):
@@ -319,10 +277,10 @@ for ep in range(total_episodes):
     avg_reward = np.mean(ep_reward_list[-40:])
     avg_reward_list.append(avg_reward)
 
-    if ep %50 == 0:
+    if ep %100 == 0:
         print("Episode * {} * Avg Reward is ==> {}".format(ep, avg_reward))
         # Save target model if its reward is more than reward of prev saved model
-    if ep %500 == 0:
+    if ep %1000 == 0:
         target_actor.save(f'Models/q_learning/MIMO/actor_ep{ep}')
         target_critic.save(f'Models/q_learning/MIMO/critic_ep{ep}')
 
@@ -401,10 +359,10 @@ SPs = []
 x0 = None
 
 x0 = env.reset(x0=x0)
-sp = 10
-for t in range(len(T)-1):
+sp = [100, 100]
+for t in range(len(T)-2):
     # if t%50==0:
-    #     sp = np.array(np.random.randint(1, 20)) 
+    #     sp = np.array(np.random.randint(1, 20, size=2)) 
     #     SPs.append(sp)
 
     state, _ = env.ret_state(sp)
@@ -422,15 +380,15 @@ ax1 = plt.subplot(121)
 ax1.set_title("Виходи процесу")
 ax1.set_ylabel("Y")
 ax1.set_xlabel("T")
-ax1.plot(np.linspace(0, 50, 249), Ys)
-ax1.plot(np.linspace(0, 50, 249), np.repeat(sp, 250)[:-1], "--")
+ax1.plot(np.linspace(0, 50, 248), Ys)
+ax1.plot(np.linspace(0, 50, 248), np.ones(248)*10, "--")
 ax1.legend(["Вихід процесу", "Завдання"])
 
 ax2 = plt.subplot(122)
 ax2.set_xlabel("T")
 ax2.set_ylabel("U")
 ax2.set_title("Сигнали керування")
-ax2.plot(np.linspace(0, 50, 249), Us[:, 0, :])
+ax2.plot(np.linspace(0, 50, 248), Us[:, 0, :])
 ax2.legend(["Керування"])
 
 plt.show()
@@ -444,7 +402,7 @@ SPs = []
 x0 = None
 
 x0 = env.reset(x0=x0)
-for t in range(len(T)-1):
+for t in range(len(T)-2):
     sp = np.sin(t/25)*8+10 
     SPs.append(sp)
 
@@ -463,15 +421,15 @@ ax1 = plt.subplot(121)
 ax1.set_title("Виходи процесу")
 ax1.set_ylabel("Y")
 ax1.set_xlabel("T")
-ax1.plot(np.linspace(0, 50, 249), Ys)
-ax1.plot(np.linspace(0, 50, 249), SPs, "--")
+ax1.plot(Ys)
+# ax1.plot(np.linspace(0, 50, 249), SPs, "--")
 ax1.legend(["Вихід 1", "Завдання"])
 
 ax2 = plt.subplot(122)
 ax2.set_xlabel("T")
 ax2.set_ylabel("U")
 ax2.set_title("Сигнали керування")
-ax2.plot(np.linspace(0, 50, 249), Us[:, 0, :])
+# ax2.plot(np.linspace(0, 50, 249), Us[:, 0, :])
 ax2.legend(["Керування"])
 
 plt.show()
@@ -487,7 +445,7 @@ x0 = None
 
 x0 = env.reset()
 for t in range(len(T)-1):
-    sp = 10 
+    sp = [10, 10] 
     SPs.append(sp)
 
     state, _ = env.ret_state(sp)
@@ -499,9 +457,7 @@ Us = np.array(Us)
 Ys = np.array(Ys)
 SPs = np.array(SPs)
 
-matplotlib.style.use('default')
 plt.figure(figsize=(15, 7))
-
 plt.ylim(bottom=-5, top=18)
 plt.xlim(left=0, right=20)
 plt.title("Виходи процесу")
@@ -513,7 +469,7 @@ plt.plot(np.linspace(0, 50, 249)[:100], SPs[:100], "r--", label="Завданн�
 ep_models_ys = np.zeros(shape=(11, 249))
 
 
-directory = r'Models/q_learning/SISO/'
+directory = r'Models/q_learning/MIMO/'
 for i, model_dir in enumerate(os.scandir(directory)):
     if model_dir.is_dir() and "target" not in model_dir.name and "actor" in model_dir.name:
         # model = tf.keras.models.load_model(model_dir.path, compile=False)
@@ -523,7 +479,7 @@ for i, model_dir in enumerate(os.scandir(directory)):
 
 
         x0 = env.reset()
-        sp = 10 
+        sp = [10, 10]
 
         for t in range(len(T)-1):
             state, _ = env.ret_state(sp)
@@ -532,7 +488,7 @@ for i, model_dir in enumerate(os.scandir(directory)):
 
         
         if not ep == 2500:
-            plt.plot(np.linspace(0, 50, 1000), ep_models_ys_smooth[i], linewidth=linewidth, alpha=alpha, label=f"Епізод {ep}")
+            plt.plot(np.linspace(0, 50, 1000), ep_models_ys[i], linewidth=linewidth, alpha=alpha, label=f"Епізод {ep}")
  
 
 plt.legend(loc=4, prop={'size': 15})
@@ -555,22 +511,23 @@ for i, row in enumerate(ep_models_ys):
 
 from matplotlib.patches import Polygon
 
+plt.figure(figsize=(15, 8))
 fig, ax = plt.subplots()
 
-ax.plot(np.linspace(0, 2500, 2500), avg_reward_list, linewidth=2)
+ax.plot(np.linspace(0, 10000, 10000), avg_reward_list, linewidth=2)
 
 area_iy = np.concatenate([avg_reward_list[:1000], np.repeat(None, 1500)])
-area_ix = np.linspace(0, 2500, 2500)
+area_ix = np.linspace(0, 10000, 10000)
 
 bbox = dict(boxstyle="round", fc="0.8")
 arrowprops = dict(
     arrowstyle = "->")
 disp = ax.annotate('Заповнення\n буфера досвіду',
-            (500, -600), xytext=(0.5*150, -35),
+            (500, -6000), xytext=(0.5*150, -35),
             textcoords='offset points',
             bbox=bbox, arrowprops=arrowprops)
 
-verts = [(1000, -1307.79), (0, -1307.79), *zip(area_ix, area_iy), (1000, -1307.79), (0, -1307.79)]
+verts = [(1000, -10500.0), (0, -10500.0), *zip(area_ix, area_iy), (1000, -10500.0), (0, -10500.0)]
 poly = Polygon(verts, facecolor='0.9')
 ax.add_patch(poly)
 
@@ -582,7 +539,8 @@ plt.show()
 # %%
 # Plot static characteristics with deltas
 T = np.linspace(0, 50, 249)
-sps = np.linspace(0.1, 20, 100)
+sps1 = np.linspace(0.1, 20, 100)
+sps2 = 0
 
 lastys = np.zeros_like(sps)
 
@@ -608,11 +566,11 @@ plt.plot(sps-lastys)
 plt.show()
 
 # %%
-# target_actor.save(f'Models/q_learning/SISO/target_actor')
-# target_critic.save(f'Models/q_learning/SISO/target_critic')
+# target_actor.save(f'Models/q_learning/MIMO/target_actor')
+# target_critic.save(f'Models/q_learning/MIMO/target_critic')
 
-target_actor = tf.keras.models.load_model(f'Models/q_learning/SISO/target_actor', compile=False)
-target_critic = tf.keras.models.load_model(f'Models/q_learning/SISO/target_critic', compile=False)
+target_actor = tf.keras.models.load_model(f'Models/q_learning/MIMO/v2/target_actor', compile=False)
+target_critic = tf.keras.models.load_model(f'Models/q_learning/MIMO/v2/target_critic', compile=False)
 # %%
 # saving training data
 # avg_reward_list = np.array(avg_reward_list)
@@ -623,17 +581,18 @@ target_critic = tf.keras.models.load_model(f'Models/q_learning/SISO/target_criti
 #     pickle.dump(W1, f)
 # %%
 # Load systems data 
-with open('Models/q_learning/SISO/system.pickle', 'rb') as f:
-    W1 = pickle.load(f)
-with open('Models/q_learning/SISO/history.npy', 'rb') as f:
+# with open('Models/q_learning/SISO/system.pickle', 'rb') as f:
+#     W1 = pickle.load(f)
+with open('Models/q_learning/MIMO/v2/history.npy', 'rb') as f:
     avg_reward_list = np.load(f)
 
 # %%
+# Plotting OU process
 ou_noise = OUActionNoise(np.zeros(1), std_deviation=.4)
 
 noise = [ou_noise() for _ in range(10000)]
 plt.figure(figsize=(10, 5))
-plt.plot(sorted(noise))
+plt.plot(noise)
 plt.show()
 
 # %%
