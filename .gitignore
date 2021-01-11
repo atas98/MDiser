@@ -2,8 +2,11 @@ __pycache__
 /Text/*
 /Models/*
 /.vscode
+*.docx
+*.xlsx
 *.pyc
 *.npy
 *.txt
 *.png
 *.log
+*gif
