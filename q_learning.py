@@ -445,7 +445,7 @@ x0 = None
 
 x0 = env.reset()
 for t in range(len(T)-1):
-    sp = [10, 10] 
+    sp = [10] 
     SPs.append(sp)
 
     state, _ = env.ret_state(sp)
@@ -458,37 +458,39 @@ Ys = np.array(Ys)
 SPs = np.array(SPs)
 
 plt.figure(figsize=(15, 7))
-plt.ylim(bottom=-5, top=18)
-plt.xlim(left=0, right=20)
+# plt.ylim(bottom=-5, top=18)
+# plt.xlim(left=0, right=20)
 plt.title("Виходи процесу")
 plt.ylabel("Y")
 plt.xlabel("T")
-plt.plot(np.linspace(0, 50, 249)[:100], Ys[:100], 'b', linewidth=1.5, label="Кінець навчання")
-plt.plot(np.linspace(0, 50, 249)[:100], SPs[:100], "r--", label="Завдання")
+plt.plot(Ys, 'b', linewidth=1.5, label="Кінець навчання")
+plt.plot(SPs, "r--", label="Завдання")
+# np.linspace(0, 50, 249)[:100],
+# np.linspace(0, 50, 249)[:100],
 
 ep_models_ys = np.zeros(shape=(11, 249))
 
 
-directory = r'Models/q_learning/MIMO/'
+directory = r'Models/q_learning/SISO/'
 for i, model_dir in enumerate(os.scandir(directory)):
     if model_dir.is_dir() and "target" not in model_dir.name and "actor" in model_dir.name:
-        # model = tf.keras.models.load_model(model_dir.path, compile=False)
+        model = tf.keras.models.load_model(model_dir.path, compile=False)
         ep = int(model_dir.name[8:])
         linewidth = 1 # ep*2.5/2500+0.5
         alpha = 1 # ep/2500*0.89+0.1
 
 
         x0 = env.reset()
-        sp = [10, 10]
+        sp = [10]
 
         for t in range(len(T)-1):
             state, _ = env.ret_state(sp)
             action = model(state.reshape(1, -1)).numpy()
             ep_models_ys[i, t] = env(action)
 
-        
+        # np.linspace(0, 50, 1000), 
         if not ep == 2500:
-            plt.plot(np.linspace(0, 50, 1000), ep_models_ys[i], linewidth=linewidth, alpha=alpha, label=f"Епізод {ep}")
+            plt.plot(ep_models_ys[i], linewidth=linewidth, alpha=alpha, label=f"Епізод {ep}")
  
 
 plt.legend(loc=4, prop={'size': 15})
@@ -569,7 +571,7 @@ plt.show()
 # target_actor.save(f'Models/q_learning/MIMO/target_actor')
 # target_critic.save(f'Models/q_learning/MIMO/target_critic')
 
-target_actor = tf.keras.models.load_model(f'Models/q_learning/MIMO/v2/target_actor', compile=False)
+target_actor = tf.keras.models.load_model(f'Models/q_learning/SISO/target_actor', compile=False)
 target_critic = tf.keras.models.load_model(f'Models/q_learning/MIMO/v2/target_critic', compile=False)
 # %%
 # saving training data
@@ -581,10 +583,10 @@ target_critic = tf.keras.models.load_model(f'Models/q_learning/MIMO/v2/target_cr
 #     pickle.dump(W1, f)
 # %%
 # Load systems data 
-# with open('Models/q_learning/SISO/system.pickle', 'rb') as f:
-#     W1 = pickle.load(f)
-with open('Models/q_learning/MIMO/v2/history.npy', 'rb') as f:
-    avg_reward_list = np.load(f)
+with open('Models/q_learning/SISO/system.pickle', 'rb') as f:
+    W1 = pickle.load(f)
+# with open('Models/q_learning/MIMO/v2/history.npy', 'rb') as f:
+#     avg_reward_list = np.load(f)
 
 # %%
 # Plotting OU process
@@ -595,4 +597,51 @@ plt.figure(figsize=(10, 5))
 plt.plot(noise)
 plt.show()
 
+# %%
+np.concatenate([np.ones((3, 3)), np.zeros((1, 3))], axis=1)
+# %%
+from celluloid import Camera
+
+fig = plt.figure()
+camera = Camera(fig)
+
+# plt.axis('off')
+plt.ylim(bottom=-0, top=10)
+plt.yticks([])
+ 
+for row in history_smoothed:
+    plt.plot(row, c="b")
+    plt.plot(np.ones(249)*6.32, c="r", ls="--")
+    camera.snap()
+ 
+animation = camera.animate()
+animation.save('celluloid_minimal.gif', writer = 'Pillow')
+# %%
+plt.plot(history[:, -12])
+# %%
+history = np.array([history[:, -12],
+                    history[:, -4],
+                    history[:, -3],
+                    history[:, -2],
+                    history[:, -5],
+                    history[:, -11],
+                    history[:, -10],
+                    history[:, -9],
+                    history[:, -8],
+                    history[:, -7],
+                    history[:, -6],
+                    history[:, -1]
+])
+# %%
+history_smoothed = np.zeros((1, 249))
+history_smoothed[0, :] = history[0, :].copy()
+
+for i in range(0, 11):
+    deltas = history[i, :]-history[i+1, :]
+    for coef in np.linspace(0, 1, 11):
+        new_row = history[i, :]-deltas*coef
+        history_smoothed = np.concatenate([history_smoothed, new_row.reshape(1, -1)], axis=0)
+
+# %%
+plt.plot(history_smoothed.transpose())
 # %%
