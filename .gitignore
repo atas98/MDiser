@@ -2,6 +2,7 @@ __pycache__
 /Text/*
 /Models/*
 /.vscode
+/ss_regression
 
 *.docx
 *.doc
